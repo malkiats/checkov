@@ -1,0 +1,48 @@
+trigger:
+- none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: |
+    python -m pip install --upgrade pip
+    pip install checkov
+  displayName: 'Install Checkov'
+
+- script: |
+    checkov -d $(Build.SourcesDirectory)/AKS-TF-LAB-5
+  displayName: 'Run Checkov'
+  condition: succeededOrFailed()
+
+- script: |
+    checkov -d $(Build.SourcesDirectory)/AKS-TF-LAB-5 --output json > $(Build.ArtifactStagingDirectory)/checkov-report.json
+  displayName: 'Run Checkov and output JSON'
+  condition: succeededOrFailed()
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+  displayName: 'Install Python'
+  condition: succeededOrFailed()
+
+- script: |
+    python3 $(Build.SourcesDirectory)/json_to_html.py $(Build.ArtifactStagingDirectory)/checkov-report.json $(Build.ArtifactStagingDirectory)/checkov-report.html
+  displayName: 'Convert JSON Report to HTML'
+  condition: succeededOrFailed()
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/checkov-report.html'
+    ArtifactName: 'Checkov HTML Report'
+    publishLocation: 'Container'
+  displayName: 'Publish HTML Report as Build Artifact'
+  condition: succeededOrFailed()
+
+- task: JakubRumpca.azure-pipelines-html-report.PublishHtmlReport.PublishHtmlReport@1
+  inputs:
+    tabName: 'Checkov Report'
+    reportDir: $(Build.ArtifactStagingDirectory)/checkov-report.html
+  displayName: 'Publish HTML Report'
+  condition: succeededOrFailed()
